@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TransitTick — Digital Transportation Ticketing</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <!-- ============ UNLOCK / LOGIN SCREEN ============ -->
+  <div id="unlock-screen" class="screen active">
+    <div class="unlock-card">
+      <div class="logo-row">
+        <div class="logo">&#128674;</div>
+        <h1>TransitTick</h1>
+      </div>
+      <p class="tagline">Secure digital tickets &amp; subscriptions for transit</p>
+
+      <div id="setup-form" class="auth-form">
+        <h2>Create Master Password</h2>
+        <div class="form-group">
+          <label for="setup-password">Master Password</label>
+          <input type="password" id="setup-password" autocomplete="new-password" />
+          <div id="setup-meter" class="pw-meter"><div class="pw-meter-bar"></div></div>
+        </div>
+        <div class="form-group">
+          <label for="setup-confirm">Confirm Password</label>
+          <input type="password" id="setup-confirm" autocomplete="new-password" />
+        </div>
+        <button id="btn-setup" class="btn btn-primary btn-block">Create Vault</button>
+        <p class="hint">Your transit data is encrypted locally with AES-256. We never see your passes.</p>
+      </div>
+
+      <div id="login-form" class="auth-form hidden">
+        <h2>Unlock</h2>
+        <div class="form-group">
+          <label for="login-password">Master Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" />
+        </div>
+        <button id="btn-login" class="btn btn-primary btn-block">Unlock</button>
+        <p id="login-error" class="error hidden">Incorrect password. Try again.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP ============ -->
+  <div id="app-screen" class="screen hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" style="width:36px;height:36px;font-size:1.2rem;">&#128674;</div>
+        <span>TransitTick</span>
+      </div>
+      <nav class="view-switcher">
+        <button class="view-btn active" data-view="operator">&#128202; Operator</button>
+        <button class="view-btn" data-view="passenger">&#128694; Passenger</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="lock-timer" class="lock-timer"></span>
+        <button id="btn-lock" class="btn btn-ghost">Lock</button>
+      </div>
+    </header>
+
+    <!-- ============ OPERATOR VIEW ============ -->
+    <div id="view-operator" class="view-content active">
+      <nav class="tabs">
+        <button class="tab active" data-tab="dashboard">&#128200; Dashboard</button>
+        <button class="tab" data-tab="routes">&#128663; Routes</button>
+        <button class="tab" data-tab="verify">&#128241; Verify</button>
+        <button class="tab" data-tab="settings">&#9881; Security</button>
+      </nav>
+
+      <!-- Dashboard -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div class="stats-row">
+          <div class="stat-card"><span class="stat-num" id="stat-revenue">$0</span><span>Revenue</span></div>
+          <div class="stat-card"><span class="stat-num" id="stat-active-pass">0</span><span>Active Passes</span></div>
+          <div class="stat-card"><span class="stat-num" id="stat-validated">0</span><span>Validated Today</span></div>
+          <div class="stat-card"><span class="stat-num" id="stat-fraud-blocked">0</span><span>Blocks Today</span></div>
+        </div>
+        <div class="panel">
+          <h3>Recent Activity</h3>
+          <div id="activity-list" class="activity-list"></div>
+          <p id="activity-empty" class="empty-state hidden">No activity yet.</p>
+        </div>
+      </section>
+
+      <!-- Routes / Tickets -->
+      <section id="tab-routes" class="tab-content">
+        <div class="toolbar">
+          <input type="text" id="route-search" class="search-input" placeholder="Search routes..." />
+          <button id="btn-add-route" class="btn btn-primary">+ Add Route</button>
+        </div>
+        <div id="route-grid" class="route-grid"></div>
+        <p id="routes-empty" class="empty-state hidden">No routes yet. Add a route to start selling tickets.</p>
+      </section>
+
+      <!-- Verify -->
+      <section id="tab-verify" class="tab-content">
+        <div class="panel">
+          <h3>QR Verification</h3>
+          <p class="panel-sub">Scan or enter a QR code to validate a ticket or subscription. Fraudulent, reused, or expired passes are blocked.</p>
+          <div class="form-group">
+            <label for="verify-code">Ticket / Pass Code</label>
+            <input type="text" id="verify-code" placeholder="Enter or scan code..." />
+          </div>
+          <button id="btn-verify" class="btn btn-primary">Validate</button>
+          <div id="verification-result" class="verification-result"></div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="tab-settings" class="tab-content">
+        <h2>Security Settings</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div>
+              <h3>Auto-Lock Timer</h3>
+              <p>Automatically lock after inactivity.</p>
+            </div>
+            <select id="auto-lock-select">
+              <option value="0">Never</option>
+              <option value="60">1 minute</option>
+              <option value="300">5 minutes</option>
+              <option value="900">15 minutes</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div>
+              <h3>Change Master Password</h3>
+              <p>Update your master password. Existing data stays encrypted.</p>
+            </div>
+            <button id="btn-change-password" class="btn btn-secondary">Change</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <h3>Danger Zone</h3>
+              <p>Permanently delete all routes, tickets and subscriptions.</p>
+            </div>
+            <button id="btn-wipe-data" class="btn btn-danger">Wipe All Data</button>
+          </div>
+        </div>
+
+        <h2 style="margin-top:40px;">Backup &amp; Restore</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div>
+              <h3>Export Backup</h3>
+              <p>Download an encrypted backup of your transit data.</p>
+            </div>
+            <button id="btn-export" class="btn btn-secondary">Export</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <h3>Import Backup</h3>
+              <p>Restore a previously exported backup. Replaces all current data.</p>
+            </div>
+            <button id="btn-import" class="btn btn-secondary">Import</button>
+            <input type="file" id="import-file" accept=".ttk,application/json" class="hidden" />
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ PASSENGER VIEW ============ -->
+    <div id="view-passenger" class="view-content">
+      <nav class="tabs">
+        <button class="tab active" data-tab="my-passes">&#127915; My Passes</button>
+        <button class="tab" data-tab="buy">&#128722; Buy Pass</button>
+        <button class="tab" data-tab="history">&#128337; History</button>
+      </nav>
+
+      <!-- My Passes -->
+      <section id="tab-my-passes" class="tab-content active">
+        <div id="pass-card" class="pass-card hidden"></div>
+        <div id="my-passes-grid" class="pass-grid"></div>
+        <p id="passes-empty" class="empty-state hidden">No active passes. Buy a ticket or subscription to get started.</p>
+      </section>
+
+      <!-- Buy Pass -->
+      <section id="tab-buy" class="tab-content">
+        <h2>Buy a Pass</h2>
+        <div class="buy-grid">
+          <div class="pass-type-card">
+            <h3>Single Ride</h3>
+            <p class="price" data-price="2.50">$2.50</p>
+            <p class="card-sub">One journey on any route.</p>
+            <button class="btn btn-primary btn-block buy-btn" data-type="single">Select Route</button>
+          </div>
+          <div class="pass-type-card">
+            <h3>Day Pass</h3>
+            <p class="price" data-price="8.00">$8.00</p>
+            <p class="card-sub">Unlimited rides for 24 hours.</p>
+            <button class="btn btn-primary btn-block buy-btn" data-type="day">Select Route</button>
+          </div>
+          <div class="pass-type-card">
+            <h3>Weekly Subscription</h3>
+            <p class="price" data-price="25.00">$25.00</p>
+            <p class="card-sub">7 days of unlimited travel.</p>
+            <button class="btn btn-primary btn-block buy-btn" data-type="weekly">Select Route</button>
+          </div>
+          <div class="pass-type-card">
+            <h3>Monthly Subscription</h3>
+            <p class="price" data-price="85.00">$85.00</p>
+            <p class="card-sub">30 days of unlimited travel.</p>
+            <button class="btn btn-primary btn-block buy-btn" data-type="monthly">Select Route</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section id="tab-history" class="tab-content">
+        <h2>Usage History</h2>
+        <div id="history-list" class="history-list"></div>
+        <p id="history-empty" class="empty-state hidden">No usage history yet.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ MODALS ============ -->
+
+  <!-- Add Route modal -->
+  <div id="modal-route" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="route-modal-title">Add Route</h3>
+      <div class="form-group"><label>Route Name</label><input type="text" id="route-name" placeholder="e.g. Blue Line — Downtown" /></div>
+      <div class="form-group"><label>Origin — Destination</label><input type="text" id="route-path" placeholder="e.g. Airport → City Center" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Single Fare ($)</label><input type="number" id="route-fare" min="0" step="0.01" /></div>
+        <div class="form-group"><label>Travel Time (min)</label><input type="number" id="route-time" min="1" step="1" value="30" /></div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-route-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="btn-route-save" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buy pass modal -->
+  <div id="modal-buy" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="buy-modal-title">Purchase Pass</h3>
+      <div class="form-group"><label>Pass Type</label><input type="text" id="buy-type" disabled /></div>
+      <div class="form-group"><label>Route</label>
+        <select id="buy-route"></select>
+      </div>
+      <div class="form-group"><label>Price</label><input type="text" id="buy-price" disabled /></div>
+      <div class="form-group"><label>Payment Details (simulated)</label><input type="text" id="buy-card" placeholder="Card number (any digits)" /></div>
+      <p id="buy-error" class="error hidden"></p>
+      <div class="modal-actions">
+        <button id="btn-buy-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="btn-buy-confirm" class="btn btn-primary">Pay &amp; Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pass / QR modal -->
+  <div id="modal-pass" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="pass-modal-title">Your Pass</h3>
+      <div id="qr-container" class="qr-container"></div>
+      <div id="pass-detail" class="pass-detail"></div>
+      <div class="modal-actions">
+        <button id="btn-pass-close" class="btn btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change password modal -->
+  <div id="modal-changepw" class="modal hidden">
+    <div class="modal-card">
+      <h3>Change Master Password</h3>
+      <div class="form-group"><label>Current Password</label><input type="password" id="cp-current" /></div>
+      <div class="form-group"><label>New Password</label><input type="password" id="cp-new" /></div>
+      <div class="form-group"><label>Confirm New Password</label><input type="password" id="cp-confirm" /></div>
+      <p id="cp-error" class="error hidden"></p>
+      <div class="modal-actions">
+        <button id="btn-cp-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="btn-cp-save" class="btn btn-primary">Update</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
